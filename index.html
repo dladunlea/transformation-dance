@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformation Dance</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        h1 {
+            color: white;
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .card-container {
+            perspective: 1000px;
+            width: 500px;
+            height: 300px;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4rem;
+            font-weight: bold;
+            color: #667eea;
+            animation: flipIn 0.6s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3), transparent);
+            animation: shine 3s infinite;
+        }
+
+        @keyframes flipIn {
+            0% {
+                transform: rotateY(-90deg);
+                opacity: 0;
+            }
+            100% {
+                transform: rotateY(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes shine {
+            0% { transform: translate(-100%, -100%) rotate(45deg); }
+            100% { transform: translate(100%, 100%) rotate(45deg); }
+        }
+
+        .controls {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 50px;
+            background: white;
+            color: #667eea;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.playing {
+            background: #667eea;
+            color: white;
+        }
+
+        .info {
+            color: white;
+            margin-top: 1rem;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 2rem; }
+            .card-container { width: 90vw; height: 250px; }
+            .card { font-size: 2.5rem; }
+            button { padding: 12px 24px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <h1>🎵 Transformation Dance 🎵</h1>
+    
+    <div class="card-container">
+        <div class="card" id="transformationCard">
+            (x, y)
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="playButton">▶ Start Dance</button>
+        <button id="nextButton">⏭ Next Card</button>
+    </div>
+
+    <div class="info">
+        <p id="bpmInfo">126 BPM • Cards change with the beat</p>
+    </div>
+
+    <script>
+        const transformations = [
+            '(x + h, y)',
+            '(x, y + k)',
+            '(x - h, y)',
+            '(x, y - k)',
+            '(x - h, y + k)',
+            '(x + h, y - k)',
+            '(x - h, y - k)',
+            '(x + h, y + k)',
+            '(-x, y)',
+            '(x, -y)',
+            '(-y, x)',
+            '(-x, -y)',
+            '(y, -x)',
+            '(x, y)',
+            '(bx, y)',
+            '(x, ay)'
+        ];
+
+        const card = document.getElementById('transformationCard');
+        const playButton = document.getElementById('playButton');
+        const nextButton = document.getElementById('nextButton');
+        
+        let isPlaying = false;
+        let intervalId = null;
+        let audioContext = null;
+        let oscillator = null;
+        let gainNode = null;
+
+        const BPM = 126;
+        const beatInterval = (60 / BPM) * 1000; // milliseconds per beat
+        const cardChangeBeats = 4; // Change card every 4 beats
+        const cardChangeInterval = beatInterval * cardChangeBeats;
+
+        function getRandomTransformation() {
+            return transformations[Math.floor(Math.random() * transformations.length)];
+        }
+
+        function updateCard() {
+            // Remove animation
+            card.style.animation = 'none';
+            
+            // Trigger reflow
+            void card.offsetWidth;
+            
+            // Update content
+            card.textContent = getRandomTransformation();
+            
+            // Re-add animation
+            card.style.animation = 'flipIn 0.6s ease-out';
+        }
+
+        function startMusic() {
+            // Create audio context for 126 BPM beat
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Create a simple kick drum sound
+            const kickInterval = beatInterval / 1000; // Convert to seconds
+            let nextKickTime = audioContext.currentTime;
+
+            function scheduleKick() {
+                if (!isPlaying) return;
+
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                
+                // Kick drum parameters
+                osc.frequency.setValueAtTime(150, nextKickTime);
+                osc.frequency.exponentialRampToValueAtTime(0.01, nextKickTime + 0.5);
+                
+                gain.gain.setValueAtTime(0.5, nextKickTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, nextKickTime + 0.5);
+                
+                osc.start(nextKickTime);
+                osc.stop(nextKickTime + 0.5);
+                
+                nextKickTime += kickInterval;
+                
+                setTimeout(scheduleKick, kickInterval * 500); // Schedule next kick
+            }
+            
+            scheduleKick();
+        }
+
+        function stopMusic() {
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
+        }
+
+        playButton.addEventListener('click', () => {
+            if (!isPlaying) {
+                // Start
+                isPlaying = true;
+                playButton.textContent = '⏸ Pause Dance';
+                playButton.classList.add('playing');
+                
+                startMusic();
+                updateCard();
+                intervalId = setInterval(updateCard, cardChangeInterval);
+            } else {
+                // Stop
+                isPlaying = false;
+                playButton.textContent = '▶ Start Dance';
+                playButton.classList.remove('playing');
+                
+                stopMusic();
+                clearInterval(intervalId);
+            }
+        });
+
+        nextButton.addEventListener('click', () => {
+            updateCard();
+        });
+
+        // Initialize with a random card
+        updateCard();
+    </script>
+</body>
+</html>
