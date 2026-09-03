@@ -38,12 +38,13 @@
         .card-container {
             perspective: 1000px;
             width: 500px;
-            height: 300px;
+            height: 400px;
+            position: relative;
         }
 
         .card {
             width: 100%;
-            height: 100%;
+            height: 300px;
             background: white;
             border-radius: 20px;
             box-shadow: 0 20px 60px rgba(0,0,0,0.3);
@@ -83,6 +84,39 @@
         @keyframes shine {
             0% { transform: translate(-100%, -100%) rotate(45deg); }
             100% { transform: translate(100%, 100%) rotate(45deg); }
+        }
+
+        .label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 0 0 20px 20px;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.2);
+            transform: translateY(100%);
+            transition: transform 0.5s ease-out;
+        }
+
+        .label.show {
+            transform: translateY(0);
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            0% {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
 
         .controls {
@@ -127,8 +161,9 @@
 
         @media (max-width: 600px) {
             h1 { font-size: 2rem; }
-            .card-container { width: 90vw; height: 250px; }
-            .card { font-size: 2.5rem; }
+            .card-container { width: 90vw; height: 350px; }
+            .card { font-size: 2.5rem; height: 250px; }
+            .label { font-size: 1.3rem; padding: 15px; }
             button { padding: 12px 24px; font-size: 1rem; }
         }
     </style>
@@ -139,6 +174,7 @@
     <div class="card-container">
         <div class="card" id="transformationCard">
             (x, y)
+            <div class="label" id="transformationLabel">Identity</div>
         </div>
     </div>
 
@@ -148,60 +184,75 @@
     </div>
 
     <div class="info">
-        <p id="bpmInfo">126 BPM • Cards change with the beat</p>
+        <p id="bpmInfo">126 BPM • Cards: 8 beats | Labels: beats 5-8</p>
     </div>
 
     <script>
         const transformations = [
-            '(x + h, y)',
-            '(x, y + k)',
-            '(x - h, y)',
-            '(x, y - k)',
-            '(x - h, y + k)',
-            '(x + h, y - k)',
-            '(x - h, y - k)',
-            '(x + h, y + k)',
-            '(-x, y)',
-            '(x, -y)',
-            '(-y, x)',
-            '(-x, -y)',
-            '(y, -x)',
-            '(x, y)',
-            '(bx, y)',
-            '(x, ay)'
+            { rule: '(x + h, y)', label: 'Horizontal Translation' },
+            { rule: '(x, y + k)', label: 'Vertical Translation' },
+            { rule: '(x - h, y)', label: 'Horizontal Translation' },
+            { rule: '(x, y - k)', label: 'Vertical Translation' },
+            { rule: '(x - h, y + k)', label: 'Diagonal Translation' },
+            { rule: '(x + h, y - k)', label: 'Diagonal Translation' },
+            { rule: '(x - h, y - k)', label: 'Diagonal Translation' },
+            { rule: '(x + h, y + k)', label: 'Diagonal Translation' },
+            { rule: '(-x, y)', label: 'Reflection over Y-axis' },
+            { rule: '(x, -y)', label: 'Reflection over X-axis' },
+            { rule: '(-y, x)', label: '90° Counterclockwise Rotation' },
+            { rule: '(-x, -y)', label: '180° Rotation' },
+            { rule: '(y, -x)', label: '90° Clockwise Rotation' },
+            { rule: '(x, y)', label: 'Identity' },
+            { rule: '(bx, y)', label: 'Horizontal Dilation' },
+            { rule: '(x, ay)', label: 'Vertical Dilation' }
         ];
 
         const card = document.getElementById('transformationCard');
+        const label = document.getElementById('transformationLabel');
         const playButton = document.getElementById('playButton');
         const nextButton = document.getElementById('nextButton');
         
         let isPlaying = false;
-        let intervalId = null;
+        let cardIntervalId = null;
+        let labelTimeoutId = null;
         let audioContext = null;
-        let oscillator = null;
-        let gainNode = null;
 
         const BPM = 126;
         const beatInterval = (60 / BPM) * 1000; // milliseconds per beat
-        const cardChangeBeats = 4; // Change card every 4 beats
+        const cardChangeBeats = 8; // Change card every 8 beats
+        const labelShowBeats = 4; // Show label after 4 beats
         const cardChangeInterval = beatInterval * cardChangeBeats;
+        const labelShowDelay = beatInterval * labelShowBeats;
 
         function getRandomTransformation() {
             return transformations[Math.floor(Math.random() * transformations.length)];
         }
 
         function updateCard() {
+            // Hide label first
+            label.classList.remove('show');
+            
             // Remove animation
             card.style.animation = 'none';
             
             // Trigger reflow
             void card.offsetWidth;
             
+            // Get new transformation
+            const transformation = getRandomTransformation();
+            
             // Update content
-            card.textContent = getRandomTransformation();
+            card.childNodes[0].textContent = transformation.rule;
+            label.textContent = transformation.label;
             
             // Re-add animation
             card.style.animation = 'flipIn 0.6s ease-out';
+            
+            // Show label after 4 beats
+            if (labelTimeoutId) clearTimeout(labelTimeoutId);
+            labelTimeoutId = setTimeout(() => {
+                label.classList.add('show');
+            }, labelShowDelay);
         }
 
         function startMusic() {
@@ -255,7 +306,7 @@
                 
                 startMusic();
                 updateCard();
-                intervalId = setInterval(updateCard, cardChangeInterval);
+                cardIntervalId = setInterval(updateCard, cardChangeInterval);
             } else {
                 // Stop
                 isPlaying = false;
@@ -263,7 +314,8 @@
                 playButton.classList.remove('playing');
                 
                 stopMusic();
-                clearInterval(intervalId);
+                clearInterval(cardIntervalId);
+                if (labelTimeoutId) clearTimeout(labelTimeoutId);
             }
         });
 
@@ -272,7 +324,9 @@
         });
 
         // Initialize with a random card
-        updateCard();
+        const initialTransform = getRandomTransformation();
+        card.childNodes[0].textContent = initialTransform.rule;
+        label.textContent = initialTransform.label;
     </script>
 </body>
 </html>
