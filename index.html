@@ -86,6 +86,27 @@
             100% { transform: translate(100%, 100%) rotate(45deg); }
         }
 
+        .transformation-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            vertical-align: middle;
+            font-size: 3rem;
+        }
+
+        .fraction-line {
+            width: 100%;
+            height: 3px;
+            background-color: #667eea;
+            margin: 2px 0;
+        }
+
         .label {
             position: absolute;
             bottom: 0;
@@ -163,6 +184,7 @@
             h1 { font-size: 2rem; }
             .card-container { width: 90vw; height: 350px; }
             .card { font-size: 2.5rem; height: 250px; }
+            .fraction { font-size: 2rem; }
             .label { font-size: 1.3rem; padding: 15px; }
             button { padding: 12px 24px; font-size: 1rem; }
         }
@@ -173,7 +195,9 @@
     
     <div class="card-container">
         <div class="card" id="transformationCard">
-            (x, y)
+            <div class="transformation-content" id="transformationContent">
+                (x, y)
+            </div>
             <div class="label" id="transformationLabel">Identity</div>
         </div>
     </div>
@@ -188,26 +212,45 @@
     </div>
 
     <script>
-        const transformations = [
-            { rule: '(x + h, y)', label: 'Horizontal Translation' },
-            { rule: '(x, y + k)', label: 'Vertical Translation' },
-            { rule: '(x - h, y)', label: 'Horizontal Translation' },
-            { rule: '(x, y - k)', label: 'Vertical Translation' },
-            { rule: '(x - h, y + k)', label: 'Diagonal Translation' },
-            { rule: '(x + h, y - k)', label: 'Diagonal Translation' },
-            { rule: '(x - h, y - k)', label: 'Diagonal Translation' },
-            { rule: '(x + h, y + k)', label: 'Diagonal Translation' },
-            { rule: '(-x, y)', label: 'Reflection over Y-axis' },
-            { rule: '(x, -y)', label: 'Reflection over X-axis' },
-            { rule: '(-y, x)', label: '90° Counterclockwise Rotation' },
-            { rule: '(-x, -y)', label: '180° Rotation' },
-            { rule: '(y, -x)', label: '270° Counterclockwise Rotation' },
-            { rule: '(x, y)', label: 'Identity' },
-            { rule: '(bx, y)', label: 'Horizontal Dilation' },
-            { rule: '(x, ay)', label: 'Vertical Dilation' }
+        // Base transformations with their counts for balancing
+        const baseTransformations = [
+            // 8 Translations (x1 = 8 total)
+            { rule: '(x + h, y)', label: 'Horizontal Translation', count: 1 },
+            { rule: '(x, y + k)', label: 'Vertical Translation', count: 1 },
+            { rule: '(x - h, y)', label: 'Horizontal Translation', count: 1 },
+            { rule: '(x, y - k)', label: 'Vertical Translation', count: 1 },
+            { rule: '(x - h, y + k)', label: 'Diagonal Translation', count: 1 },
+            { rule: '(x + h, y - k)', label: 'Diagonal Translation', count: 1 },
+            { rule: '(x - h, y - k)', label: 'Diagonal Translation', count: 1 },
+            { rule: '(x + h, y + k)', label: 'Diagonal Translation', count: 1 },
+            
+            // 2 Reflections (x4 = 8 total)
+            { rule: '(-x, y)', label: 'Reflection over Y-axis', count: 4 },
+            { rule: '(x, -y)', label: 'Reflection over X-axis', count: 4 },
+            
+            // 4 Rotations (x2 = 8 total)
+            { rule: '(-y, x)', label: '90° Counterclockwise Rotation', count: 2 },
+            { rule: '(-x, -y)', label: '180° Rotation', count: 2 },
+            { rule: '(y, -x)', label: '90° Clockwise Rotation', count: 2 },
+            { rule: '(x, y)', label: 'Identity', count: 2 },
+            
+            // 4 Dilations/Scalings (x2 = 8 total)
+            { rule: '(bx, y)', label: 'Horizontal Dilation', count: 2 },
+            { rule: '(x, ay)', label: 'Vertical Dilation', count: 2 },
+            { rule: 'fraction-1', label: 'Horizontal Contraction', count: 2 }, // (1/b x, y)
+            { rule: 'fraction-2', label: 'Vertical Contraction', count: 2 }  // (x, 1/a y)
         ];
 
+        // Expand transformations based on count
+        const transformations = [];
+        baseTransformations.forEach(t => {
+            for (let i = 0; i < t.count; i++) {
+                transformations.push({ rule: t.rule, label: t.label });
+            }
+        });
+
         const card = document.getElementById('transformationCard');
+        const transformationContent = document.getElementById('transformationContent');
         const label = document.getElementById('transformationLabel');
         const playButton = document.getElementById('playButton');
         const nextButton = document.getElementById('nextButton');
@@ -223,6 +266,15 @@
         const labelShowBeats = 4; // Show label after 4 beats
         const cardChangeInterval = beatInterval * cardChangeBeats;
         const labelShowDelay = beatInterval * labelShowBeats;
+
+        function createFractionHTML(numerator, denominator, variable, position) {
+            // position: 'first' or 'second' for x or y coordinate
+            if (position === 'first') {
+                return `(<div class="fraction"><span>${numerator}</span><div class="fraction-line"></div><span>${denominator}</span></div>${variable}, y)`;
+            } else {
+                return `(x, <div class="fraction"><span>${numerator}</span><div class="fraction-line"></div><span>${denominator}</span></div>${variable})`;
+            }
+        }
 
         function getRandomTransformation() {
             return transformations[Math.floor(Math.random() * transformations.length)];
@@ -241,8 +293,17 @@
             // Get new transformation
             const transformation = getRandomTransformation();
             
-            // Update content
-            card.childNodes[0].textContent = transformation.rule;
+            // Update content based on type
+            if (transformation.rule === 'fraction-1') {
+                // (1/b x, y)
+                transformationContent.innerHTML = createFractionHTML('1', 'b', 'x', 'first');
+            } else if (transformation.rule === 'fraction-2') {
+                // (x, 1/a y)
+                transformationContent.innerHTML = createFractionHTML('1', 'a', 'y', 'second');
+            } else {
+                transformationContent.textContent = transformation.rule;
+            }
+            
             label.textContent = transformation.label;
             
             // Re-add animation
@@ -324,9 +385,7 @@
         });
 
         // Initialize with a random card
-        const initialTransform = getRandomTransformation();
-        card.childNodes[0].textContent = initialTransform.rule;
-        label.textContent = initialTransform.label;
+        updateCard();
     </script>
 </body>
 </html>
